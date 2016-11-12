@@ -9,22 +9,22 @@ package com.example.shmuelhanagid.maptestgal;
  * and prices.
  */
 public class BeerEntry {
-    eBrandName brand;
+    String brand;
     boolean hasHalf;
     boolean hasPint;
     boolean hasThird;
-    int pricePint;
-    int priceHalf;
-    int priceThird;
+    String pricePint;
+    String priceHalf;
+    String priceThird;
 
     public BeerEntry(Beer inputBeer) {
         brand = inputBeer.brand;
         hasHalf = false;
         hasPint = false;
         hasThird = false;
-        priceThird = 0;
-        pricePint = 0;
-        priceHalf = 0;
+        priceThird = "0";
+        pricePint = "0";
+        priceHalf = "0";
         FillEntryUsingBeerObject(inputBeer);
 
 
@@ -36,15 +36,15 @@ public class BeerEntry {
         {
             case ThirdLiter:
                 hasThird = true;
-                priceThird = curBeer.price.priceInNis;
+                priceThird = curBeer.price;
                 break;
             case Pint:
                 hasPint = true;
-                pricePint = curBeer.price.priceInNis;
+                pricePint = curBeer.price;
                 break;
             case HalfLiter:
                 hasHalf = true;
-                priceHalf = curBeer.price.priceInNis;
+                priceHalf = curBeer.price;
                 break;
             case Other:
                 break;

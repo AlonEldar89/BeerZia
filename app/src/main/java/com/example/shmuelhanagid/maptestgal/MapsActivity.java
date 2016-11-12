@@ -4,12 +4,15 @@ import android.*;
 import android.Manifest;
 import android.app.Fragment;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.database.DataSetObserver;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
+import android.provider.ContactsContract;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
@@ -36,6 +39,11 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.vision.Frame;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,16 +51,20 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 
+
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         OnMarkerClickListener,
-        GoogleMap.OnCameraChangeListener,
+        GoogleMap.OnCameraMoveListener,
         GoogleMap.OnInfoWindowClickListener
 
+
 {
+    private DatabaseReference mDatabase;
 
     private GoogleMap mMap;
     public static String theVal = "howdy";
     public static boolean pullDown = false;
+
     /**
      * ATTENTION: This was auto-generated to implement the App Indexing API.
      * See https://g.co/AppIndexing/AndroidStudio for more information.
@@ -112,11 +124,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         mMap.setMyLocationEnabled(true);
 
+
+        PopulateMapFromDB(mMap);
         //mMap.moveCamera(CameraUpdateFactory.newLatLng(test));
         mMap.addMarker(new MarkerOptions().position(test).title(theVal));
         mMap.setOnMarkerClickListener(this);
         mMap.setOnInfoWindowClickListener(this);
-        mMap.setOnCameraChangeListener(this);
+        mMap.setOnCameraMoveListener(this);
 
 
         LocationManager LM = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -143,10 +157,65 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
+    private void PopulateMapFromDB(final GoogleMap mMap) {
+
+        mDatabase = FirebaseDatabase.getInstance().getReference();
+        mDatabase.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                // This method is called once with the initial value and again
+                // whenever data at this location is updated.
+
+                Iterator<DataSnapshot> pubIter = dataSnapshot.child("pubs").getChildren().iterator();
+                while (pubIter.hasNext()) {
+                    DataSnapshot curEntry = pubIter.next();
+                    // Pub name is the key of the db entry, and also the name of the marker.
+                    String pubName = curEntry.getKey();
+                    // pub location (needs to be parsed, save as "Lat,Long" string
+                    String pubLoc = curEntry.child("Location").getValue().toString();
+                    LatLng curLLA = stringToLatLng(pubLoc);
+                    mMap.addMarker(new MarkerOptions()
+                            .position(curLLA)
+                            .title(pubName));
+
+
+
+                }
+                ArrayList<String> tmpAL = (ArrayList<String>) dataSnapshot.child("beers").getValue();
+
+                Beer.beerBrands = new String[tmpAL.size()];
+                tmpAL.toArray(Beer.beerBrands);
+
+
+
+                //Log.d(TAG, "Value is: " + value);
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                // Failed to read value
+                //Log.w(TAG, "Failed to read value.", error.toException());
+            }
+        });
+
+
+
+
+
+
+    }
+
+    private LatLng stringToLatLng(String pubLoc) {
+        String[] latlong =  pubLoc.split(",");
+        double latitude = Double.parseDouble(latlong[0]);
+        double longitude = Double.parseDouble(latlong[1]);
+        return new LatLng(latitude,longitude);
+    }
+
 
     @Override
     public boolean onMarkerClick(Marker marker) {
-        marker.setTitle(theVal);
+        marker.setTitle(marker.getTitle());
         //marker.showInfoWindow();
         LinearLayout mapWrapperLayout = (LinearLayout) findViewById(R.id.mapWrapper);
 
@@ -154,14 +223,24 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         LinearLayout infoLayout = (LinearLayout) findViewById(R.id.infoLayout);
         LinearLayout.LayoutParams infoParams = (LinearLayout.LayoutParams) infoLayout.getLayoutParams();
 
+
+
+
+
+
         if (!pullDown) {
             //infoParams.weight = 2;
-            mapParams.weight = 1;
+
             pullDown = true;
             FillPubContent(marker);
+            mapParams.height = ConvertDPtoPixel(425);
+            infoLayout.setVisibility(View.VISIBLE);
+            infoParams.height = ConvertDPtoPixel(125);
+
         } else {
-            //mapParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
-            mapParams.weight = 0;
+            mapParams.height = ConvertDPtoPixel(550);
+            infoLayout.setVisibility(View.GONE);
+
             //infoParams.weight = 0;
             ClearContentFromLayout();
             pullDown = false;
@@ -186,7 +265,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         LinearLayout masterContentLayout = (LinearLayout) findViewById(R.id.scrollContentLayout);
 
 
-        ArrayList<BeerEntry> curPubBeerList = getBeerList(marker.hashCode());
+        ArrayList<BeerEntry> curPubBeerList = getBeerList(marker.getTitle());
 
         for (BeerEntry curBeerEntry : curPubBeerList){
             //Add a new "Line"
@@ -216,7 +295,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             TextView brandTV = new TextView(this);
             brandTV.setGravity(Gravity.CENTER_VERTICAL);
 
-            brandTV.setText(curBeerEntry.brand.toString());
+            brandTV.setText(curBeerEntry.brand);
             lbrandLayout.addView(brandTV);
 
 
@@ -324,19 +403,69 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         return px;
     }
 
-    private ArrayList<BeerEntry> getBeerList(int markerHashCode) {
-        ArrayList<Beer> beerList = new ArrayList<Beer>();
-        Beer ex1 = new Beer(eBrandName.Goldstar, new Price(25), new BeerSize(eQuantity.HalfLiter));
+    public ArrayList<Beer> beerList = new ArrayList<Beer>();
+    private ArrayList<BeerEntry> getBeerList(final String markerTitle) {
+
+
+        beerList.clear();
+        synchronized (mDatabase) {
+            mDatabase.addValueEventListener(new ValueEventListener() {
+
+
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    // This method is called once with the initial value and again
+                    // whenever data at this location is updated.
+
+                    ArrayList<String> tapBeers = (ArrayList<String>) dataSnapshot.child("pubs").child(markerTitle)
+                            .child("Tap").getValue();
+                    for (String beerStr : tapBeers) {
+                        Beer curTapBeer = new Beer(beerStr);
+                        beerList.add(curTapBeer);
+
+
+                    }
+
+                    // Get List of Pub Beers.
+
+
+                }
+
+
+                //Log.d(TAG, "Value is: " + value);
+
+
+                @Override
+                public void onCancelled(DatabaseError error) {
+                    // Failed to read value
+                    //Log.w(TAG, "Failed to read value.", error.toException());
+                    error.toString();
+
+
+                }
+            });
+
+        }
+
+
+
+
+
+
+
+
+        /*Beer ex1 = new Beer(eBrandName.Goldstar, new Price(25), new BeerSize(eQuantity.HalfLiter));
         beerList.add(ex1);
         Beer ex2 = new Beer(eBrandName.Goldstar, new Price(22), new BeerSize(eQuantity.ThirdLiter));
-        beerList.add(ex2);
+        beerList.add(ex2);*/
 
         ArrayList<BeerEntry> entriesToShow = consolidateBeerList(beerList);
-
 
         return entriesToShow;
 
     }
+
+
 
     private ArrayList<BeerEntry> consolidateBeerList(ArrayList<Beer> beerList) {
         ArrayList<BeerEntry> entriesList = new ArrayList<BeerEntry>();
@@ -368,10 +497,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
 
-    private static boolean ContainsBrand(ArrayList<BeerEntry> entriesList, eBrandName wantedBrand) {
+
+
+    private static boolean ContainsBrand(ArrayList<BeerEntry> entriesList, String wantedBrand) {
 
         for (BeerEntry entry : entriesList) {
-            if (entry != null && entry.brand == wantedBrand) {
+            if (entry != null && entry.brand.equals(wantedBrand)) {
                 return true;
             }
         }
@@ -380,10 +511,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
 
-    @Override
-    public void onCameraChange(CameraPosition cameraPosition) {
-        theVal = cameraPosition.target.toString();
-    }
+
+
+
+
 
     @Override
     public void onInfoWindowClick(Marker marker) {
@@ -429,6 +560,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         );
         AppIndex.AppIndexApi.end(client, viewAction);
         client.disconnect();
+    }
+
+    public void mapSearchBeerClick(View view) {
+        Intent myIntent = new Intent(MapsActivity.this,SearchBeer.class);
+        MapsActivity.this.startActivity(myIntent);
+
+
+    }
+
+    @Override
+    public void onCameraMove() {
+        theVal = mMap.getCameraPosition().toString();
+
     }
 }
 
