@@ -11,12 +11,14 @@ import android.database.DataSetObserver;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.provider.ContactsContract;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -29,6 +31,7 @@ import android.widget.TextView;
 import com.google.android.gms.appindexing.Action;
 import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.drive.query.Query;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.OnMarkerClickListener;
@@ -38,6 +41,7 @@ import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.vision.Frame;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -125,7 +129,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setMyLocationEnabled(true);
 
 
-        PopulateMapFromDB(mMap);
+        PopulateMapFromDB();
         //mMap.moveCamera(CameraUpdateFactory.newLatLng(test));
         mMap.addMarker(new MarkerOptions().position(test).title(theVal));
         mMap.setOnMarkerClickListener(this);
@@ -157,18 +161,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-    private void PopulateMapFromDB(final GoogleMap mMap) {
+    private void PopulateMapFromDB() {
 
         mDatabase = FirebaseDatabase.getInstance().getReference();
+        Log.v("A","Start loading Data");
         mDatabase.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 // This method is called once with the initial value and again
                 // whenever data at this location is updated.
 
-                Iterator<DataSnapshot> pubIter = dataSnapshot.child("pubs").getChildren().iterator();
-                while (pubIter.hasNext()) {
-                    DataSnapshot curEntry = pubIter.next();
+                for (DataSnapshot curEntry : dataSnapshot.child("pubs").getChildren()) {
                     // Pub name is the key of the db entry, and also the name of the marker.
                     String pubName = curEntry.getKey();
                     // pub location (needs to be parsed, save as "Lat,Long" string
@@ -179,10 +182,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             .title(pubName));
 
 
-
                 }
                 ArrayList<String> tmpAL = (ArrayList<String>) dataSnapshot.child("beers").getValue();
-
+                Log.v("A","finished loading Data");
                 Beer.beerBrands = new String[tmpAL.size()];
                 tmpAL.toArray(Beer.beerBrands);
 
@@ -203,7 +205,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
 
+
+
+
+
     }
+
+
 
     private LatLng stringToLatLng(String pubLoc) {
         String[] latlong =  pubLoc.split(",");
@@ -262,11 +270,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void FillPubContent(Marker marker) {
         // This is the master layout of pub content on click event.
         // all content (=linearLayouts, the "grid") will be added to this layout
+        getBeerList(marker.getTitle());
+        //ArrayList<Beer> curPubBeerList = getBeerList(marker.hashCode());
+
+    }
+
+    private void UpdateGuiWithBeersFromDB(ArrayList<BeerEntry> curPubBeerList) {
         LinearLayout masterContentLayout = (LinearLayout) findViewById(R.id.scrollContentLayout);
-
-
-        ArrayList<BeerEntry> curPubBeerList = getBeerList(marker.getTitle());
-
         for (BeerEntry curBeerEntry : curPubBeerList){
             //Add a new "Line"
             LinearLayout lLineLayout = new LinearLayout(this);
@@ -388,64 +398,52 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
         }
-
-
-        //ArrayList<Beer> curPubBeerList = getBeerList(marker.hashCode());
-
     }
 
     private int ConvertDPtoPixel(int yourdpmeasure) {
         Resources r = this.getResources();
-        int px = (int) TypedValue.applyDimension(
+        return (int) TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP,
                 yourdpmeasure,
                 r.getDisplayMetrics());
-        return px;
     }
 
-    public ArrayList<Beer> beerList = new ArrayList<Beer>();
-    private ArrayList<BeerEntry> getBeerList(final String markerTitle) {
+    public ArrayList<Beer> beerList = new ArrayList<>();
+    private void getBeerList(final String markerTitle) {
 
 
         beerList.clear();
-        synchronized (mDatabase) {
-            mDatabase.addValueEventListener(new ValueEventListener() {
+
+        Log.v("A","before add listener");
 
 
-                @Override
-                public void onDataChange(DataSnapshot dataSnapshot) {
-                    // This method is called once with the initial value and again
-                    // whenever data at this location is updated.
-
-                    ArrayList<String> tapBeers = (ArrayList<String>) dataSnapshot.child("pubs").child(markerTitle)
-                            .child("Tap").getValue();
-                    for (String beerStr : tapBeers) {
-                        Beer curTapBeer = new Beer(beerStr);
-                        beerList.add(curTapBeer);
-
-
-                    }
-
-                    // Get List of Pub Beers.
-
+        mDatabase.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                // This method is called once with the initial value and again
+                // whenever data at this location is updated.
+                // Get List of Pub Beers.
+                ArrayList<String> tapBeers = (ArrayList<String>) dataSnapshot.child("pubs").child(markerTitle)
+                        .child("Tap").getValue();
+                for (String beerStr : tapBeers) {
+                    Beer curTapBeer = new Beer(beerStr);
+                    beerList.add(curTapBeer);
 
                 }
+                Log.v("A","Finished inside listener");
+                ArrayList<BeerEntry> beerEntriesTmp = consolidateBeerList(beerList);
+                UpdateGuiWithBeersFromDB(beerEntriesTmp);
+            }
 
+            //Log.d(TAG, "Value is: " + value);
+            @Override
+            public void onCancelled(DatabaseError error) {
+                // Failed to read value
+                //Log.w(TAG, "Failed to read value.", error.toException());
+                error.toString();
+            }
+        });
 
-                //Log.d(TAG, "Value is: " + value);
-
-
-                @Override
-                public void onCancelled(DatabaseError error) {
-                    // Failed to read value
-                    //Log.w(TAG, "Failed to read value.", error.toException());
-                    error.toString();
-
-
-                }
-            });
-
-        }
 
 
 
@@ -459,16 +457,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Beer ex2 = new Beer(eBrandName.Goldstar, new Price(22), new BeerSize(eQuantity.ThirdLiter));
         beerList.add(ex2);*/
 
-        ArrayList<BeerEntry> entriesToShow = consolidateBeerList(beerList);
 
-        return entriesToShow;
+
+
 
     }
 
 
 
     private ArrayList<BeerEntry> consolidateBeerList(ArrayList<Beer> beerList) {
-        ArrayList<BeerEntry> entriesList = new ArrayList<BeerEntry>();
+        ArrayList<BeerEntry> entriesList = new ArrayList<>();
         BeerEntry tmpEntry;
 
         for (Beer curBeer : beerList) {
@@ -485,9 +483,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
     private ArrayList<BeerEntry> UpdateEntries(ArrayList<BeerEntry> entriesList, Beer curBeer) {
-        ArrayList<BeerEntry> updatedList = new ArrayList<BeerEntry>();
+        ArrayList<BeerEntry> updatedList = new ArrayList<>();
         for (BeerEntry entry : entriesList) {
-            if (entry != null && entry.brand == curBeer.brand) {
+            if (entry != null && entry.brand.equals(curBeer.brand)) {
                 entry.FillEntryUsingBeerObject(curBeer);
             }
             updatedList.add(entry);
