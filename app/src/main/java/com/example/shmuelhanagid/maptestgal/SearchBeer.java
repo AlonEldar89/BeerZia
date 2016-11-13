@@ -2,15 +2,16 @@ package com.example.shmuelhanagid.maptestgal;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.MultiAutoCompleteTextView;
 
+import static com.example.shmuelhanagid.maptestgal.Beer.beerBrands;
+
 public class SearchBeer extends AppCompatActivity {
     AutoCompleteTextView text;
     MultiAutoCompleteTextView text1;
-    String[] brands={"Goldstar","Carlsberg","Guinness","Beck's"};
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -19,7 +20,7 @@ public class SearchBeer extends AppCompatActivity {
         text=(AutoCompleteTextView)findViewById(R.id.autoCompBrand);
         //text1=(MultiAutoCompleteTextView)findViewById(R.id.multiAutoCompleteTextView1);
 
-        ArrayAdapter adapter = new ArrayAdapter(this,android.R.layout.simple_list_item_1,brands);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,Beer.beerBrands);
 
         text.setAdapter(adapter);
         text.setThreshold(1);

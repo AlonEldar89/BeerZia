@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">mapTestGal</string>
+    <string name="app_name">BeerZia</string>
     <string name="title_activity_maps">Map</string>
-    <string name="defaultInfoText">Is this real life?</string>
+    <string name="defaultInfoText"></string>
 </resources>

@@ -164,7 +164,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void PopulateMapFromDB() {
 
         mDatabase = FirebaseDatabase.getInstance().getReference();
-        Log.v("A","Start loading Data");
+        //Log.v("A","Start loading Data");
         mDatabase.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
@@ -184,7 +184,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                 }
                 ArrayList<String> tmpAL = (ArrayList<String>) dataSnapshot.child("beers").getValue();
-                Log.v("A","finished loading Data");
+                //Log.v("A","finished loading Data");
                 Beer.beerBrands = new String[tmpAL.size()];
                 tmpAL.toArray(Beer.beerBrands);
 
@@ -275,8 +275,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-    private void UpdateGuiWithBeersFromDB(ArrayList<BeerEntry> curPubBeerList) {
+    private void UpdateGuiWithBeersFromDB(ArrayList<BeerEntry> curPubBeerList, String markerTitle) {
         LinearLayout masterContentLayout = (LinearLayout) findViewById(R.id.scrollContentLayout);
+        TextView tvTitle = (TextView) findViewById(R.id.infoText);
+        tvTitle.setText(markerTitle);
+
         for (BeerEntry curBeerEntry : curPubBeerList){
             //Add a new "Line"
             LinearLayout lLineLayout = new LinearLayout(this);
@@ -318,9 +321,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             lParams2.weight = 2;
             lthirdIconLayout.setOrientation(LinearLayout.VERTICAL);
             lParams2.gravity = Gravity.FILL | Gravity.CENTER;
+
             lthirdIconLayout.setLayoutParams(lParams2);
             ImageView thirdImage = new ImageView (this);
             thirdImage.setImageResource(R.mipmap.beerglass);
+//            thirdImage.setImageResource(R.drawable.third256);
 
             lthirdIconLayout.addView(thirdImage);
 
@@ -352,9 +357,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             lParams4.weight = 2;
             lPintIconLayout .setOrientation(LinearLayout.VERTICAL);
             lParams4.gravity = Gravity.FILL | Gravity.CENTER;
+
             lPintIconLayout .setLayoutParams(lParams4);
             ImageView pintImage = new ImageView (this);
             pintImage.setImageResource(R.mipmap.beerglass);
+//            pintImage.setImageResource(R.drawable.half512);
 
             lPintIconLayout.addView(pintImage);
 
@@ -432,7 +439,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
                 Log.v("A","Finished inside listener");
                 ArrayList<BeerEntry> beerEntriesTmp = consolidateBeerList(beerList);
-                UpdateGuiWithBeersFromDB(beerEntriesTmp);
+                UpdateGuiWithBeersFromDB(beerEntriesTmp,markerTitle);
             }
 
             //Log.d(TAG, "Value is: " + value);
